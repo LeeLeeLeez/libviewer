@@ -27,6 +27,17 @@ import subprocess
 import sys
 import time
 
+# 🔴🔴 强制 stdout/stderr 走 UTF-8。
+#   2026-10-14 血案：从 pythonw（无控制台）经 gh_upload 调起本脚本时，
+#   stdout 编码是 GBK，打印 `✅`（emoji）直接 UnicodeEncodeError，
+#   整个脚本 rc=1 —— 但 **exe 其实已经打包成功**，
+#   表现为「打包失败（退出码 1）。输出末尾：」后面要么空白、要么一堆乱码。
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SPEC = os.path.join(HERE, '元件库查看器.spec')
 DIST = os.path.join(HERE, 'dist')

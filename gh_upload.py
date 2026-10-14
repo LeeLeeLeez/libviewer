@@ -454,14 +454,29 @@ def build_exe(log=print):
             os.remove(outf)
     except OSError:
         pass
+    # 🔴 给子进程钉死 UTF-8 —— 否则 Windows 下 stdout 是 GBK，
+    #    make_exe.py 打印 emoji（✅/✔）会 UnicodeEncodeError 崩掉，
+    #    而 exe 其实已经打包好了（2026-10-14 实测）。
+    env = _clean_env()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     tail = []
     with open(outf, "wb") as fo:
-        pr = subprocess.Popen(argv, cwd=HERE, env=_clean_env(),
+        pr = subprocess.Popen(argv, cwd=HERE, env=env,
                               stdout=fo, stderr=subprocess.STDOUT,
                               stdin=subprocess.DEVNULL)
         pr.wait()
+    text = ""
     try:
-        text = open(outf, encoding="utf-8", errors="replace").read()
+        _raw = open(outf, "rb").read()
+        for _enc in ("utf-8", "gbk", "cp936"):
+            try:
+                text = _raw.decode(_enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            text = _raw.decode("utf-8", "replace")
     except Exception:
         text = ""
     if not text:
