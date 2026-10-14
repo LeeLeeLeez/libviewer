@@ -1,0 +1,28 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ---- 打包产物（Release 附件会单独上传 exe）----
+build/
+dist/
+*.spec.bak*
+
+# ---- 运行/日志产物 ----
+*.log
+*.out
+*.tmp
+_*.txt
+gh_upload_error.log
+
+# ---- 本机专用 ----
+.gh_token
+libviewer_cfg.json
+selftest*.log
+
+# ---- 库文件快照（体积大、随时可重建；需要时作为 Release 附件单发）----
+# lib_cache.json      <- 故意不忽略：它要作为 Release 附件上传
+
+# ---- 备份 ----
+*.bak_*
+*.bak_del_*
