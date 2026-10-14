@@ -23,6 +23,10 @@ selftest*.log
 # ---- 库文件快照（体积大、随时可重建；需要时作为 Release 附件单发）----
 # lib_cache.json      <- 故意不忽略：它要作为 Release 附件上传
 
+# ---- 临时产物 ----
+AD_Lib_*.zip
+_make_exe_output.log
+
 # ---- 备份 ----
 *.bak_*
 *.bak_del_*

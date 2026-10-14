@@ -46,7 +46,10 @@ C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe main.py
 |---|---|
 | `元件库查看器.exe` | 单文件程序（olefile 已打进包，**零外部依赖**）|
 | `lib_cache.json` | 库数据快照（各类符号 / 封装名单）|
-| **AD 库正本 ×16** | `resistor/Resistor.SchLib` … `Port/Port.PcbLib`（约 **52 MB**）|
+| **`AD_Lib_<YYYYMMDD>.zip`** | **16 个 AD 库正本打成的一个压缩包**（约 **46 MB**，原始 52 MB）。
+内部保留 `<folder>/<Stem>.SchLib|.PcbLib` 结构，解开即可还原库目录 |
+
+上传压缩包时，会**自动删掉 Release 上旧的散装库附件**（`.SchLib`/`.PcbLib`），避免两套并存。
 
 🔴 **所有附件上传前都做明文检验**：读到 `%TSD-Header-###%`
 （本机 DLP 加密特征）的**直接跳过并在结果里报警**，绝不把密文推到仓库。

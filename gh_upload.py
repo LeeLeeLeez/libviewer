@@ -38,11 +38,17 @@ import stat
 import sys
 import subprocess
 import time
+import zipfile
 import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 API = "https://api.github.com"
+
+# 打包用的 console 解释器（本机 Python 3.12，带 PyInstaller + tkinter）。
+# 换机器要改这一行 —— 与 make_exe.py / *.cmd 里用的是同一个。
+BUILD_PY = (r"C:\Users\admin\AppData\Local\Programs\Python"
+            r"\Python312\python.exe")
 
 # ---- 网络健壮性（2026-10-08 加）--------------------------------------------
 # 一次上传要发 ~27 个 HTTPS 请求，任一抖动就整单失败；这里统一退避重试。
@@ -325,7 +331,15 @@ def _console_python(path):
 
 def _find_build_python(log=print):
     """找一个同时具备 PyInstaller 和 tkinter 的解释器（优先带控制台的）。"""
+    # 🔴🔴 2026-10-14 实测：双击 cmd 启动时父进程是 **pythonw**（无控制台），
+    #    此时 `py.exe` 会让孙进程拿不到有效 stdout —— make_exe 一 print 就 rc=1，
+    #    而且**一点输出都没有**（上传日志里「输出末尾：」后面是空白）。
+    #    所以：① 硬编码的 console python 最优先（确定有 PyInstaller+tkinter）；
+    #          ② 其次 sys.executable 去掉 w（pythonw.exe → 同目录 python.exe）；
+    #          ③ 最后才 py / PATH。
     cands = []
+    if os.path.isfile(BUILD_PY):
+        cands.append([BUILD_PY])
     if not getattr(sys, "frozen", False):
         cands.append([_console_python(sys.executable)])
     p = shutil.which("py")
@@ -391,6 +405,35 @@ def _preclean(specnm, log=print):
     return not os.path.exists(bd)
 
 
+def make_lib_zip(items, log=print, out_dir=None):
+    """把 AD 库正本打成一个 zip。返回 (zip 路径, 原始总字节, 文件数)。
+
+    🔴 每个文件都要先过 `read_plain()` —— **密文的直接抛错**，绝不塞进 zip。
+    zip 内保留 `<folder>/<Stem><ext>` 的相对结构，解开即可还原库目录。
+
+    （2026-10-14 用户要求：不要 16 个附件一个个传，压成一个。）
+    """
+    out_dir = out_dir or HERE
+    zip_path = os.path.join(out_dir, "AD_Lib_%s.zip" % time.strftime("%Y%m%d"))
+    try:
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+    except OSError:
+        pass
+    total = 0
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED,
+                         compresslevel=6) as zf:
+        for p, label in items:
+            data = read_plain(p)          # 明文检验；密文 -> SystemExit
+            arc = label.replace("\\", "/")
+            zf.writestr(arc, data)
+            total += len(data)
+            log("     + %-34s %9d B" % (arc, len(data)))
+    if open(zip_path, "rb").read(4)[:2] != b"PK":
+        raise RuntimeError("打出来的 zip 头不是 PK，拒绝上传: %s" % zip_path)
+    return zip_path, total, len(items)
+
+
 def build_exe(log=print):
     """调 make_exe.py 重新打包，返回 dist/元件库查看器.exe 路径。
 
@@ -403,22 +446,40 @@ def build_exe(log=print):
     log("打包解释器: %s" % " ".join(py))
     argv = py + ["make_exe.py"]
     log("$ " + " ".join(argv))
+    # 🔴 输出**重定向到文件**，不用 PIPE —— pythonw 父进程下 PIPE 给子进程的
+    #    stdout 是无效句柄，make_exe 一 print 就 rc=1 且无任何输出。
+    outf = os.path.join(HERE, "_make_exe_output.log")
+    try:
+        if os.path.exists(outf):
+            os.remove(outf)
+    except OSError:
+        pass
     tail = []
-    pr = subprocess.Popen(argv, cwd=HERE, env=_clean_env(),
-                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          text=True, errors="replace", bufsize=1)
-    for line in pr.stdout:
+    with open(outf, "wb") as fo:
+        pr = subprocess.Popen(argv, cwd=HERE, env=_clean_env(),
+                              stdout=fo, stderr=subprocess.STDOUT,
+                              stdin=subprocess.DEVNULL)
+        pr.wait()
+    try:
+        text = open(outf, encoding="utf-8", errors="replace").read()
+    except Exception:
+        text = ""
+    if not text:
+        text = ("（make_exe.py 没有任何输出，退出码 %s）"
+                "—— 多半是解释器/环境问题，检查上面那行「打包解释器」路径。"
+                % pr.returncode)
+    for line in text.splitlines():
         line = line.rstrip()
         if line:
             log("   " + line)
             tail.append(line)
             if len(tail) > 30:
                 tail.pop(0)
-    pr.wait()
     exe = os.path.join(HERE, "dist", "元件库查看器.exe")
     if pr.returncode != 0 or not os.path.isfile(exe):
         raise RuntimeError("打包失败（退出码 %s）。输出末尾：\n%s"
-                           % (pr.returncode, "\n".join(tail[-12:])))
+                           % (pr.returncode, "\n".join(tail[-12:])
+                              or text[-800:]))
     if open(exe, "rb").read(4) == b"%TSD":
         raise RuntimeError("exe 是 DLP 密文，拒绝上传（删掉 dist 目录重打一次）")
     log("exe 就绪: %s  %.1f MB" % (exe, os.path.getsize(exe) / 1048576.0))
@@ -635,10 +696,6 @@ def do_upload(token, repo_name, message="", public=True, log=print,
                     log("   (跳过不存在的附件 %s)" % rel_path)
                     continue
                 lib_items.append((p, rel_path))
-            ad_items = ad_lib_files(log)
-            log("AD 库正本: %d 个文件" % len(ad_items))
-            lib_items += ad_items
-
             total_b = 0
             for p, label in lib_items:
                 try:
@@ -651,7 +708,45 @@ def do_upload(token, repo_name, message="", public=True, log=print,
                 total_b += len(blob)
                 log("   明文检验通过: %-30s %9d B" % (label, len(blob)))
                 assets.append((p, label))
-            log("库文件合计 %.1f MB" % (total_b / 1048576.0))
+            log("散装库文件合计 %.1f MB" % (total_b / 1048576.0))
+
+            # AD 库正本 -> 打成一个 zip（用户要求：不逐个传）
+            ad_items = ad_lib_files(log)
+            if ad_items:
+                log("AD 库正本: %d 个文件 -> 打包成一个 zip" % len(ad_items))
+                try:
+                    zp, raw_b, n = make_lib_zip(ad_items, log=log)
+                    assets.append((zp, os.path.basename(zp)))
+                    log("   压缩包 %s：%d 个文件，%.1f MB（原始 %.1f MB）"
+                        % (os.path.basename(zp), n,
+                           os.path.getsize(zp) / 1048576.0,
+                           raw_b / 1048576.0))
+                except SystemExit as e:
+                    problems.append("AD 库打包失败（明文检验未过）：%s"
+                                    % str(e).splitlines()[-1][:150])
+                    log("!! AD 库打包失败（明文检验）：%s" % e)
+                except Exception as e:
+                    problems.append("AD 库打包失败：%s" % str(e)[:150])
+                    log("!! AD 库打包失败：%s" % e)
+            else:
+                log("(没找到 AD 库正本，跳过)")
+
+            # 🔴 换成 zip 后，Release 上可能还留着旧的**散装库附件**
+            #    （.SchLib/.PcbLib）—— 顺手删掉，免得同一个 Release 里两套并存。
+            if any(os.path.basename(p).lower().startswith("ad_lib_")
+                   for p, _ in assets):
+                try:
+                    olds = _req("GET", "%s/repos/%s/%s/releases/%s/assets"
+                                % (API, owner, repo_name, rel["id"]), token)
+                    for a in (olds or []):
+                        nm = a.get("name", "")
+                        if nm.lower().endswith((".schlib", ".pcblib")):
+                            _req("DELETE",
+                                 "%s/repos/%s/%s/releases/assets/%s"
+                                 % (API, owner, repo_name, a["id"]), token)
+                            log("   已删除旧的散装库附件: %s" % nm)
+                except SystemExit:
+                    pass
 
             for p, label in assets:
                 try:

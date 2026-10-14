@@ -240,7 +240,9 @@ class Uploader(tk.Tk):
                 ok = False
                 self.txt.insert("end", "  FAIL %-32s %s\n"
                                 % (label, str(e).strip().splitlines()[-1][:70]))
-        self.txt.insert("end", "\n  库文件合计 %.1f MB\n" % (nb / 1048576.0))
+        self.txt.insert("end", "\n  散装库文件 %.1f MB；"
+                               "AD 库正本 %d 个 -> 上传时会打成**一个 zip**\n"
+                        % (nb / 1048576.0, len(ad)))
         self.txt.insert("end", "  → %s\n"
                         % ("全部明文，可以上传" if ok
                            else "有密文：请先转明（AD 打开+保存 → 读库数据）再传"))
