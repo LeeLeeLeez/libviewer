@@ -28,6 +28,7 @@ import json
 import queue
 import threading
 import subprocess
+import time
 import traceback
 import tkinter as tk
 from tkinter import ttk
@@ -472,6 +473,67 @@ class HomePage(ttk.Frame):
         self.app = app
         self._busy = False
         self._build()
+        # 🔴 启动后自查「库文件是否比缓存新」——
+        #    查看器是**缓存驱动**：改完库不重建缓存，界面时间就一直是旧的。
+        #    2026-10-15 用户连遇两次，故加这道提示（只提示，不自动写文件）。
+        try:
+            self.after(700, self._check_stale)
+        except Exception:
+            pass
+
+    def _check_stale(self):
+        """比对缓存里记的 mtime 与库文件实际 mtime；不一致就提示重建。
+
+        缓存里 `sch_src.mtime` / `pcb_src.mtime` 是**字符串**（到分钟），
+        所以这里也按同样格式生成再比。
+        """
+        try:
+            import plainize as _pz
+            cache_p = os.path.join(HERE, 'lib_cache.json')
+            if not os.path.isfile(cache_p):
+                return
+            with open(cache_p, encoding='utf-8') as f:
+                c = json.load(f)
+            base = _pz.get_base()
+            stale = []
+            for e in c.get('categories') or []:
+                folder, stem = e.get('folder'), e.get('stem')
+                if not folder or not stem:
+                    continue
+                for ext, key in (('.SchLib', 'sch_src'),
+                                 ('.PcbLib', 'pcb_src')):
+                    src = e.get(key) or {}
+                    mt = src.get('mtime')
+                    p = os.path.join(base, folder, stem + ext)
+                    if not mt or not os.path.isfile(p):
+                        continue
+                    real = time.strftime(
+                        '%Y-%m-%d %H:%M',
+                        time.localtime(os.path.getmtime(p)))
+                    if real != mt:
+                        stale.append('%s%s：缓存 %s → 实际 %s'
+                                     % (stem, ext, mt, real))
+            if stale:
+                self._log('')
+                self._log('⚠ 有 %d 个库文件比缓存新'
+                          ' —— 下面显示的是旧数据：'
+                          % len(stale))
+                for x in stale[:12]:
+                    self._log('    ' + x)
+                if len(stale) > 12:
+                    self._log('    …（还有 %d 个）' % (len(stale) - 12))
+                self._log('    → 点【读取库数据】重建缓存即可。')
+                try:
+                    self.lbl_hint.configure(
+                        text='⚠ 库文件已更新，请点【读取库数据】',
+                        foreground='#D97706')
+                except Exception:
+                    pass
+        except Exception as e:
+            try:
+                self._log('（库文件变化检测失败：%r）' % e)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------ 构建
     def _build(self):
@@ -942,10 +1004,16 @@ class CategoryPage(ttk.Frame):
 
         src = tk.Frame(self, bg=PAL['bg'])
         src.pack(fill='x', padx=14, pady=(4, 6))
-        ttk.Label(src, text='原理图库来源：' + self._src_text(e['sch_src']),
-                  style='Muted.TLabel').pack(anchor='w')
-        ttk.Label(src, text='PCB库来源：' + self._src_text(e['pcb_src']),
-                  style='Muted.TLabel').pack(anchor='w')
+        # 🔴 存引用 —— rebuild(reload_only=True) 后要更新这两个 Label 的时间
+        #    （2026-10-15 之前没存，rebuild 后表格变了、时间还停在旧值）
+        self.lbl_sch_src = ttk.Label(
+            src, text='原理图库来源：' + self._src_text(e['sch_src']),
+            style='Muted.TLabel')
+        self.lbl_sch_src.pack(anchor='w')
+        self.lbl_pcb_src = ttk.Label(
+            src, text='PCB库来源：' + self._src_text(e['pcb_src']),
+            style='Muted.TLabel')
+        self.lbl_pcb_src.pack(anchor='w')
 
         pw = gs.paned(self, orient='v')
         pw.pack(fill='both', expand=True, padx=10, pady=(0, 10))
@@ -971,6 +1039,23 @@ class CategoryPage(ttk.Frame):
                 self, d.get('name', ''), {'封装名': d.get('name', '')},
                 {'PCB库': self._src_text(e['pcb_src'])}))
         self.sec_pcb.pack(fill='both', expand=True)
+        self.sec_pcb.set_rows(e['pcb'])
+
+    def refresh(self):
+        """从 self.entry 重新填表格与来源时间（rebuild(reload_only=True) 后调）。
+
+        🔴 之前 rebuild 只 set_rows 了表格，「来源时间」两个 Label 没刷新，
+           导致点完「读取库数据」时间也不变（2026-10-15 修）。
+        """
+        e = self.entry
+        try:
+            self.lbl_sch_src.config(
+                text='原理图库来源：' + self._src_text(e['sch_src']))
+            self.lbl_pcb_src.config(
+                text='PCB库来源：' + self._src_text(e['pcb_src']))
+        except Exception:
+            pass
+        self.sec_sch.set_rows(e['sch'])
         self.sec_pcb.set_rows(e['pcb'])
 
     @staticmethod
@@ -2231,8 +2316,11 @@ class App:
                 if not e:
                     continue
                 page.entry = e
-                page.sec_sch.set_rows(e['sch'])
-                page.sec_pcb.set_rows(e['pcb'])
+                if hasattr(page, 'refresh'):
+                    page.refresh()          # 🔴 连「来源时间」Label 一起刷
+                else:
+                    page.sec_sch.set_rows(e['sch'])
+                    page.sec_pcb.set_rows(e['pcb'])
             if getattr(self, 'home_page', None) is not None:
                 try:
                     self.home_page.refresh()
