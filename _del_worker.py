@@ -83,50 +83,15 @@ def mode_list():
     return out
 
 
-def mode_del(mode, lib, names, dry):
-    fn = LD.delete_schlib_symbols if mode == 'sch' else LD.delete_pcblib_footprints
-    print('库   : %s' % lib)
-    print('形态 : %s   （必须 ole 明文）' % LD.kind(lib))
-    print('目标 : %d 个 → %s' % (len(names), ', '.join(names)))
-    if len(names) > LD.MAX_BATCH:
-        r = {'ok': False, 'deleted': 0, 'backup': None,
-             'msg': '单次最多 %d 个（本次 %d）' % (LD.MAX_BATCH, len(names))}
-        print('✘ ' + r['msg'])
-        print('@' + json.dumps(r, ensure_ascii=False))
-        return 1
-    if dry:
-        r = fn(lib, names, backup=False, dry_run=True, log=print)
-    else:
-        # 删前记下名单，删后复读核对（双向）
-        before = _names(mode, lib)
-        r = fn(lib, names, backup=True, dry_run=False, log=print)
-        after = _names(mode, lib)
-        gone = [x for x in before if x not in set(after)]
-        extra = [x for x in after if x not in set(before)]
-        print('复读核对：删前 %d → 删后 %d' % (len(before), len(after)))
-        print('  目标消失 %d：%s' % (len(gone), ', '.join(gone)))
-        if extra:
-            print('  ⚠⚠ 意外消失 %d（幽灵删除）：%s' % (len(extra), ', '.join(extra)))
-            r['ok'] = False
-            r['msg'] += ' ｜ 意外消失 %d 个' % len(extra)
-        elif sorted(gone) != sorted(names):
-            r['ok'] = False
-            r['msg'] += ' ｜ 目标与实际消失不一致'
-        else:
-            print('  ✅ 双向核对通过（目标尽消失、无多余）')
-    print('@' + json.dumps(r, ensure_ascii=False))
-    return 0 if r.get('ok') else 1
-
-
-def _names(mode, lib):
-    if mode == 'sch':
-        return [x['name'] for x in LR.read_schlib({'path': lib, 'zip_entry': None})]
-    return [x['name'] for x in LR.read_pcblib({'path': lib, 'zip_entry': None})]
+def _removed(mode):
+    """删除子命令已于 2026-10-22 下线（「删除」tab 整体移除）。"""
+    print('✘ 删除功能已于 2026-10-22 下线', file=sys.stderr)
+    return 3
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--mode', required=True, choices=['list', 'sch', 'pcb'])
+    ap.add_argument('--mode', required=True, choices=['list'])
     ap.add_argument('--lib')
     ap.add_argument('--names')
     ap.add_argument('--dry', action='store_true')
@@ -135,11 +100,7 @@ def main():
     if a.mode == 'list':
         print(json.dumps(mode_list(), ensure_ascii=False))
         return 0
-    if not a.lib or not a.names:
-        print('✘ 需要 --lib 与 --names', file=sys.stderr)
-        return 2
-    names = [x for x in a.names.split(',') if x]
-    return mode_del(a.mode, a.lib, names, a.dry)
+    return _removed(a.mode)
 
 
 if __name__ == '__main__':

@@ -47,7 +47,7 @@ EXE_NAME = '元件库查看器.exe'
 
 # ↳ GUI 进程内 import 的（不复制，用 exe 里的）
 GUI_MODULES = ['main.py', 'gui_style.py', 'gui_sidebar.py',
-               'delete_page.py', 'plainize.py', 'appicon_data.py',
+               'plainize.py', 'appicon_data.py',
                'worker_bridge.py']
 
 # ↳ 外部 venv 进程要用的脚本 —— C 方案（2026-10-14）后**不再需要**复制：
@@ -61,6 +61,7 @@ DATA_FILES = ['lib_cache.json']
 # ↳ 时间戳基线：这些文件任一比 exe 新 ⇒ 打包是旧的
 #   ⚠ lib_reader / lib_delete / _del_worker / build_cache 现在**也进包了**
 #     （exe 自任 worker），改了它们同样必须重打包。
+#   🔴 2026-10-22: 「删除」tab 与删除功能已下线（delete_page.py 已移除）。
 STAMP_BASELINE = (GUI_MODULES + ['appicon.ico', 'lib_reader.py',
                                  'lib_delete.py', '_del_worker.py',
                                  'build_cache.py', '元件库查看器.spec'])

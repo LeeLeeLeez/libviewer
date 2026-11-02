@@ -55,7 +55,7 @@ a = Analysis(
     # 函数内 import 的模块，静态分析抓不全 → 显式列出
     hiddenimports=[
         'appicon_data',      # main.apply_icon 内 import
-        'worker_bridge',     # main / delete_page import
+        'worker_bridge',     # main import
         'plainize',          # HomePage.on_fetch 内 import
         'lib_reader',        # build_cache / _del_worker import
         'lib_delete',        # _del_worker import

@@ -43,7 +43,6 @@ print('  _MEI  =%s' % FAKE_MEI)
 print()
 
 import main as M                                                          # noqa: E402
-import delete_page as DP                                                  # noqa: E402
 import worker_bridge as wb                                                # noqa: E402
 
 print('=== A 组：main 路径 ===')
@@ -81,7 +80,6 @@ print('=== B 组：worker_bridge 路径 ===')
 chk('B1 wb.FROZEN is True', wb.FROZEN is True, wb.FROZEN)
 chk('B2 wb.APP_DIR == dist', wb.APP_DIR == DIST, wb.APP_DIR)
 chk('B3 wb.RES_DIR == _MEIPASS', wb.RES_DIR == FAKE_MEI, wb.RES_DIR)
-chk('B4 delete_page.HERE == dist', DP.HERE == DIST, DP.HERE)
 
 print()
 print('=== C 组：worker argv 拼接（frozen 态）===')

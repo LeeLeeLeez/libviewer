@@ -146,7 +146,6 @@ FILES = [
     # ---- GUI 本体（打包进 exe）----
     "main.py",
     "worker_bridge.py",
-    "delete_page.py",
     "gui_style.py",
     "gui_sidebar.py",
     "plainize.py",
@@ -170,14 +169,8 @@ FILES = [
     # ---- 自检 ----
     "_frozen_check.py",
     "_exe_smoke.py",
-    "_encoding_check.py",
     "_icon_check.py",
     "_home_check.py",
-    "_delpage_check.py",
-    "_delpage_e2e.py",
-    "_btnstate_check.py",
-    "_keepcursor_check.py",
-    "_refreshall_check.py",
     # ---- 上传器自身 ----
     "gh_upload.py",
     "启动上传GitHub.cmd",

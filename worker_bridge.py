@@ -49,9 +49,8 @@ WORK_PY = r'C:\Users\admin\.workbuddy\binaries\python\envs\default\Scripts\pytho
 
 # sub → 源码态脚本名
 _SCRIPTS = {
+    # 🔴 2026-10-22: 'sch'/'pcb'（删除子命令）随「删除」tab 一并下线
     'list': '_del_worker.py',
-    'sch': '_del_worker.py',
-    'pcb': '_del_worker.py',
     'build': 'build_cache.py',
 }
 
@@ -123,7 +122,7 @@ def _run_inproc(sub, args):
                 import build_cache as _m
                 _m.main()
                 rc = 0
-            elif sub in ('list', 'sch', 'pcb'):
+            elif sub == 'list':
                 import _del_worker as _m
                 rc = int(_m.main() or 0)
             else:

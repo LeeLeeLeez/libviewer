@@ -82,93 +82,6 @@ C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe main.py
 > 上述两个仓库均为**独立项目**，与本仓库无从属关系；
 > 本仓库只是在本地环境中与它们配合使用。
 
-## symbol更新（工具页）
-
-**给已建库的物料条目换原理图符号图形**，而**保留该物料的身份**。
-
-| 来源 | 取自 |
-|---|---|
-| **图形**（pins / 线条 / 多边形 / 标签 …） | **参考件**（你提供 SchLib 或下载包目录） |
-| **名字 · 描述 · 参数 · 封装链** | **目标件**（库里那条既有物料，默认全部保留） |
-
-- **目标 MPN**：**可输入关键词筛选的下拉**。
-  - 进来就自动按 MPN 列好（形如 `IMT65R015M2H  (06M010002034)`，括号内是库里的符号名），**按 MPN 排序**
-  - **输入即筛选**（大小写不敏感，型号片段 / 料号都能匹配），边打边缩候选并自动展开
-  - 无匹配会提示；**清空输入恢复全量**；聚焦即全选，方便选完再搜一次
-  - 换类别**自动刷新**；之前选的值若已失效（改过名/换过类别）**自动清空**并提示重选
-  - 严格校验：**必须是候选里的项**才能执行 —— 免得停在半截关键词上白跑一次
-  - 选中后内部自动还原成真正的符号名
-  - 候选来自查看器缓存，所以是**瞬时**填充，不用等、也不用先点按钮
-- 参考 SchLib 支持**直接给下载包目录**（自动定位 `.SchLib`）
-- 想顺手改参数/描述/封装链？取消对应的「保留」勾选即可开放表单
-  （取消后会先「从目标件带出」当前值供你改）
-- **PcbLib 全程不动**
-
-### 实现要点
-
-`update_component` **只干一件事 —— 换图形（+ 必要时改描述）**；
-参数改动交给 `manage_schlib_parameters`、封装链交给 `manage_schlib_footprints`。
-
-> 为什么拆开：`update_component` 是整体替换，`parameters` 里带 `raw_params`（保真载体），
-> 若同时改 `value` / `hidden` 容易和 raw 字段打架。让每个工具只做它最擅长的那一件事，
-> 是这里最稳的组合（实测：图形 12 pins → 5 pins，而名字/描述/6 参数/封装链**逐条不变**）。
-
-### 校验（不通过不回写）
-
-图形计数 == 参考件 · 名字未变 · 描述符合预期 · 6 参数逐条对值与可见性 ·
-封装链一致 · **符号数不变** · `validate_library` 的 error 数不超基线。
-
-## Schlib更新（工具页）
-
-把「**只更新原理图库、不动 PcbLib**」这套流程做成了一键操作。
-
-### 两种模式
-
-| 模式 | 你要提供的 | 行为 |
-|---|---|---|
-| **带 symbol** | **源 SchLib 文件地址**（里面已有那颗新符号）+ 符号名 | 把该符号按家规追加进目标类别库；LibRef 保持源符号名 |
-| **不带 symbol** | **同族物料符号作参考**（参考库 + 参考符号名）+ **MPN** | 复制参考符号的**图形**，改名为 MPN；参考就在目标库里时走库内复制，否则走跨库复制 |
-
-> 「不带 symbol」是对「同族新料」的固化解法：图形沿用同族（尺寸/引脚一致），只换参数。
-> 参考库默认就是目标类别库（切类别时会跟着走，除非你手动改过）。
-
-### 参数由你手动填写
-
-`Comment`（可见）/ `Part Number` / `Specification` / `MPN` / `Manufacturer` / `Footprint` / `Description`
-—— 全部手动输入。旁边提供「**从源/参考符号带出**」，把参考件已有的参数填进表单供你改，省去重敲。
-
-### 执行流程与护栏
-
-```
-P0 前置检查 → P1 备份正式库 → P2 复制符号 → P3 按家规整改参数
-→ P4 链接封装（指向该类别 PcbLib 里已有的封装）→ P5 全项校验 → P6 回写
-```
-
-- **先写 temp 副本**：P5 校验不过 ⇒ **绝不回写**，正式库保持原样
-- **P1 自动备份**正式库（可关，但不建议）
-- **P5 校验全项**：符号数 +1 / 原有符号一个不少 / 6 个参数逐条对值 + 可见性 /
-  恰好 1 条封装链且 `library_path` 指向该类别 PcbLib / `validate_library` 的 error 数不得超过基线
-- **PcbLib 全程只读**：工具只往封装链里写路径，不触碰 PcbLib 文件
-- 执行在**后台线程**，右侧日志实时滚动；可点「中止」（当前步骤结束后停）
-
-### 家规（内置，无需你记）
-
-- 参数集固定 6 项：`Comment` **可见**，其余 5 项**隐藏**
-- **`Preferred` 不设**（库内旧符号里的 `P` 属遗留）
-- D 类：`LibRef = MPN`、`Part Number = ''`（显式置空）—— 「不带 symbol」模式会把新符号名校验为必须等于 MPN
-- 封装链带 `library_path` 绝对路径
-
-### 相关文件
-
-| 文件 | 作用 |
-|---|---|
-| `schlib_update.py` | 两条流程：`run_update`（新增/建档）与 `run_symbol_update`（换图） |
-| `mcp_client.py` | 离线 MCP 的 stdio JSON-RPC 客户端（GUI 不依赖 olefile） |
-| `schlib_update_cfg.json` | Schlib更新 tab 的表单状态 |
-| `symbol_update_cfg.json` | symbol更新 tab 的表单状态 |
-| `smoke_test_update.py` | 两个工具 tab 的自检（66 项，含真实 MCP 只读调用） |
-| `_e2e_update.py` | Schlib更新 端到端实测（15 项，不动真库） |
-| `_e2e_symupd.py` | symbol更新 端到端实测（17 项，不动真库） |
 
 ## 图标
 
@@ -225,7 +138,6 @@ for k, lbl in ((1, 'BIG'), (0, 'SMALL'), (2, 'SMALL2')):
   - 无源器件：01电阻 · 02电容 · 09电感
   - 半导体：05二极管 · 06晶体管
   - 集成电路：07IC
-  - **工具：Schlib更新 · symbol更新**（见下方专节）
 - **右侧**：当前类别的两个纵向分栏（sash 可拖拽调高）
   - **原理图库 (SchLib)** —— 显示 `符号名 / 料号 / MPN / 厂商 / 封装 / spec`
   - **PCB库 (PcbLib)** —— 显示 `封装名`
@@ -254,13 +166,10 @@ for k, lbl in ((1, 'BIG'), (0, 'SMALL'), (2, 'SMALL2')):
 | `lib_cache.json` | 预解析的库数据（GUI 读它，因此启动即秒开） |
 | `build_cache.py` | 重建缓存的脚本（**需要 olefile**，用隔离 venv 跑） |
 | `lib_reader.py` | 库解析模块（olefile 读 OLE 结构） |
-| `schlib_update.py` | 两条流程：新增建档 + 换图 |
 | `mcp_client.py` | 离线 MCP 的 stdio JSON-RPC 客户端 |
 | `gui_style.py` | 统一 UI 风格模块（本机所有 GUI 的视觉基准） |
 | `gui_sidebar.py` | 左侧竖排图标菜单组件 + 17 个矢量图标 |
 | `smoke_test.py` | 查看器无头自检（54 项，含阴性对照） |
-| `smoke_test_update.py` | 工具 tab 自检（66 项，含真实 MCP 只读） |
-| `_e2e_update.py` / `_e2e_symupd.py` | 两条流程的端到端实测（不动真库） |
 | `_run3s.py` | 真 mainloop 跑 3 秒后自关（验证能起窗口） |
 | `启动元件库查看器.cmd` | 双击启动器 |
 
@@ -365,13 +274,6 @@ C:\Users\admin\.workbuddy\binaries\python\envs\default\Scripts\python.exe _runte
 # 单独跑（需先 export PYTHONPATH=<venv>\Lib\site-packages，系统 Python 无 olefile）
 # 查看器自检（63 项，含阴性对照）
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe smoke_test.py
-
-# 两个工具 tab 自检（82 项；--fast 跳过真实 MCP 调用）
-C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe smoke_test_update.py
-
-# 端到端实测（write_back=False，不动真库）
-C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe _e2e_update.py
-C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe _e2e_symupd.py
 
 # 真 mainloop 起窗口
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe _run3s.py
