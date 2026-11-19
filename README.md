@@ -1,209 +1,194 @@
-# 元件库查看器 (LibViewer)
+# LibViewer — Altium Component Library Viewer
 
-按物料类别浏览 Altium 原理图库 / PCB 库的 GUI 工具。
+A lightweight desktop tool for browsing Altium schematic and PCB libraries by
+material category. It reads a pre-built cache, so startup is fast and no Altium
+installation is required for browsing.
 
-![风格](https://img.shields.io/badge/UI-现代浅色%20tkinter%2Fttk-2563EB)
+![UI](https://img.shields.io/badge/UI-modern%20light%20tkinter%2Fttk-2563EB)
 
-## 用法
+## Usage
 
-**双击 `启动元件库查看器.cmd`** 即可。
-
-或在命令行：
+Double-click **`启动元件库查看器.cmd`**, or run:
 
 ```
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe main.py
 ```
 
-## 密文转明文→ 已独立成 **ad_convert**
+## Upload to GitHub
 
-工具已搬到 **`E:\AI_model\ad_convert`**，与本仓库分开维护。
+Double-click **`启动上传GitHub.cmd`** to open the uploader, enter your token,
+then click **Start Upload**. The repository is created automatically on first
+use.
 
-- 入口：`ad_convert\启动密文转明文.cmd`（双击，支持拖入文件夹）
-- 支持：`.SchLib` `.PcbLib` `.SchDoc` `.PcbDoc`
-- 详情见 `ad_convert\README.md`
+- **Preflight (offline)** checks every local file before anything is sent.
+- Check **Package exe + library files as release assets** to attach
+  `元件库查看器.exe`, `lib_cache.json`, and an `AD_Lib_<YYYYMMDD>.zip`
+  archive of the Altium library files.
+- Get a token at <https://github.com/settings/tokens> → Generate new token
+  (classic) → enable `repo`.
+- See the module docstring of `gh_upload.py` for the command-line equivalent.
 
-> 🔴 **为什么要单独拿出去：**DLP 按**进程白名单**解密 ——
-> `python.exe` 在白名单里能读到明文，而**本仓库打包的 exe 不在白名单**，
-> 读到的是原始密文。所以「转明」必须由跑 Python 的脚本来做。
-> 本仓库的查看器 exe 若提示「读不了密文快照」，就用 `ad_convert` 转完再回来。
+Token placeholder in this document: `LeeLeeLeez` / `libviewer`.
 
-## 上传到 GitHub
+The uploader itself (`gh_upload.py`, `upload_gui.py`, and the launcher) is a
+local-only tool and is not included in this repository.
 
-**双击 `启动上传GitHub.cmd`** 打开上传工具：
-填 Token → 点「开始上传」。首次运行会自动建库。
+## Releases
 
-- 点「**先体检（不联网）**」可先看看哪些文件还是 DLP 密文（密文会被拒绝上传）。
-- 勾「**打包 exe + 库文件作为附件**」后，Release 会带上：
-  `元件库查看器.exe` + `lib_cache.json` + **16 个 AD 库正本**（约 52 MB）。
-- Token 获取：<https://github.com/settings/tokens> → Generate new token (classic) → 勾 `repo`。
-- 命令行等价用法见 `gh_upload.py` 的模块说明。
+When publishing with `upload_gui.py`, a release carries:
 
-## 发布（Release 内容）
-
-用 `upload_gui.py` 发版本时，Release 会带上：
-
-| 附件 | 说明 |
+| Asset | Description |
 |---|---|
-| `元件库查看器.exe` | 单文件程序（olefile 已打进包，**零外部依赖**）|
-| `lib_cache.json` | 库数据快照（各类符号 / 封装名单）|
-| **`AD_Lib_<YYYYMMDD>.zip`** | **16 个 AD 库正本打成的一个压缩包**（约 **46 MB**，原始 52 MB）。
-内部保留 `<folder>/<Stem>.SchLib|.PcbLib` 结构，解开即可还原库目录 |
+| `元件库查看器.exe` | Single-file executable (olefile bundled; no external dependencies) |
+| `lib_cache.json` | Pre-parsed library snapshot (symbol / footprint lists per category) |
+| `AD_Lib_<YYYYMMDD>.zip` | All Altium library masters in one archive; keeps the `<folder>/<Stem>.SchLib|.PcbLib` layout |
 
-上传压缩包时，会**自动删掉 Release 上旧的散装库附件**（`.SchLib`/`.PcbLib`），避免两套并存。
+Uploading the archive automatically removes older, individually attached
+`.SchLib` / `.PcbLib` assets so only one set is kept.
 
-🔴 **所有附件上传前都做明文检验**：读到 `%TSD-Header-###%`
-（本机 DLP 加密特征）的**直接跳过并在结果里报警**，绝不把密文推到仓库。
+## Related repositories
 
-密文库的转明办法：在 AD 里**打开该库 → `File | Save`**
-（生成明文的 History 快照），再点查看器的「**读取库数据**」，
-然后重新上传。也可在上传 GUI 里先点「**先体检（不联网）**」
-看看哪些附件还是密文。
+Browsing works fully offline (Python + olefile). Two independent open-source
+MCP servers are used when you need to drive a running Altium Designer or
+execute UI commands:
 
-## 相关仓库（两个 MCP 服务器）
-
-本工具的「读库」能力可以完全离线跑（Python + olefile），
-但在**转明文 / 读 DLP 密文 / 驱动 AD** 等场景下会用到下面两个独立开源的 MCP 服务器：
-
-| MCP | 作用 | 仓库 |
+| MCP | Purpose | Repository |
 |---|---|---|
-| **离线 MCP**<br>`altium-designer-mcp` | 纯文件级读写 `.SchLib` / `.PcbLib`，
-**不需要 AD 运行** | <https://github.com/embedded-society/altium-designer-mcp> |
-| **桥接 MCP**<br>`eda-agent` | 驱动**正在运行的 Altium Designer**，
-可读 DLP 密文、执行 UI 命令 | <https://github.com/salitronic/eda-agent> |
+| **Offline MCP** `altium-designer-mcp` | File-level read/write of `.SchLib` / `.PcbLib`, no Altium required | <https://github.com/embedded-society/altium-designer-mcp> |
+| **Bridge MCP** `eda-agent` | Controls a running Altium Designer, executes UI commands | <https://github.com/salitronic/eda-agent> |
 
-- **离线 MCP**（v1.0.5，GPL-3.0-or-later）：产物是 `altium-designer-mcp.exe`，
-  配置在 `%USERPROFILE%\.altium-designer-mcp\config.json`，
-  授权库目录写在 `allowed_paths`。
-- **桥接 MCP**（`eda-agent`）：stdio 直连，本机用
-  `eda-agent --no-dashboard serve` 启动。
-  🔴 AD 重启后需重跑轮询：
-  `File → Run Script… → Altium_API → Dispatcher.pas → StartMCPServer → Run`。
+- Offline MCP (v1.0.5, GPL-3.0-or-later): produces `altium-designer-mcp.exe`;
+  configuration lives in `%USERPROFILE%\.altium-designer-mcp\config.json`,
+  with allowed library directories listed under `allowed_paths`.
+- Bridge MCP (`eda-agent`): stdio server, started with
+  `eda-agent --no-dashboard serve`. After restarting Altium, restart the
+  polling loop via
+  `File → Run Script… → Altium_API → Dispatcher.pas → StartMCPServer → Run`.
 
-> 上述两个仓库均为**独立项目**，与本仓库无从属关系；
-> 本仓库只是在本地环境中与它们配合使用。
+Both are separate projects. This repository merely interoperates with them
+in the local environment.
 
+## Icons
 
-## 图标
-
-以单词 **「Lib」** 为蓝本的字母标：圆角方形徽章（主色渐变 `#4F8DF7 → #1D4ED8`）+ 白色粗体 **Lib**，
-顶部一道渐隐高光。字号按**实测墨迹宽度**反推（占 66%），保证左右留白一致、小尺寸不贴边。
+The mark is a lettermark based on the word **Lib**: a rounded-square badge
+(gradient `#4F8DF7 → #1D4ED8`) with bold white **Lib** and a soft highlight.
+Glyph sizes are derived from measured ink width (66% of the box) so margins
+stay balanced at small sizes.
 
 ```bash
-# 重新生成（默认 A 款）
-python make_icon.py A      # 或 B（书脊）/ C（堆叠卡片）
+python make_icon.py A      # or B (spine) / C (stacked cards)
 ```
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `appicon.ico` | 多尺寸（16/20/24/32/40/48/64/128/256），`iconbitmap` 用 —— **任务栏小图锐利** |
-| `appicon_data.py` | **内嵌 base64** 的 PNG + ICO（自动生成，勿手改） |
-| `appicon.png` / `icon_preview.png` | 参考图 / 三款对比图（**会被 DLP 加密，仅供人看**） |
-| `make_icon.py` | 生成脚本（唯一需要 Pillow 的地方） |
+| `appicon.ico` | Multi-size icon (16/20/24/32/40/48/64/128/256) used by `iconbitmap` |
+| `appicon_data.py` | Auto-generated base64-embedded PNG + ICO (do not edit by hand) |
+| `appicon.png` / `icon_preview.png` | Reference images for human review |
+| `make_icon.py` | Icon generator; the only place Pillow is needed |
 
-### 🔴 为什么要内嵌而不用 png 文件
+Icons are embedded as bytes in `appicon_data.py` so the application stays
+self-contained without external image assets. At runtime:
 
-本机 **DLP 会加密 `.png`**（实测变 `%TSD-Header`），Tk 不是授权进程 → 读不了，
-`iconphoto` 会静默失败。而 **`.py` / `.ico` 不受影响** ⇒ 把字节 base64 内嵌进 `.py`
-是唯一 DLP-proof 的载体。运行时：
+- Large image: `PhotoImage(data=<embedded PNG>)` → `iconphoto`
+  (Alt-Tab / taskbar thumbnail)
+- Small image: embedded ICO written to a temporary file → `iconbitmap`
+  (16×16 taskbar icon)
 
-- **大图**：`PhotoImage(data=<内嵌PNG>)` → `iconphoto`（Alt-Tab / 任务栏缩略图）
-- **小图**：内嵌 ICO 落一个临时文件 → `iconbitmap`（任务栏 16×16）
+Call order matters: **`iconphoto` overrides `iconbitmap`**, so `iconbitmap`
+must come last. Keep a reference to `PhotoImage` or it is garbage-collected
+and the icon disappears.
 
-⚠️ 顺序有讲究：**`iconphoto` 会覆盖 `iconbitmap`**，所以 `iconbitmap` 必须放在最后。
-⚠️ `PhotoImage` 必须留引用，否则被 GC，图标随即消失。
+Taskbar ownership requires `SetCurrentProcessExplicitAppUserModelID`; without
+it Windows groups the window under `pythonw.exe` and shows the Python icon.
+It is set before any window is created (`set_app_user_model_id()`).
 
-### 任务栏认不认你，还得靠 AppUserModelID
-
-不调 `SetCurrentProcessExplicitAppUserModelID` 的话，Windows 会把窗口算到 `pythonw.exe` 名下、
-显示 Python 图标。程序在**建窗之前**就设好它（`set_app_user_model_id()`）。
-
-### 怎么验证图标真的挂上了
-
-`wm_iconbitmap()` 查询对 .ico 不可靠（返回空字符串，即使设置成功）。
-用 Win32 直接读窗口句柄：
+To verify the icon is actually attached, query the window handle directly —
+`wm_iconbitmap()` is unreliable for `.ico`:
 
 ```python
 import ctypes
 hwnd = int(root.frame(), 16)
 u = ctypes.windll.user32
 for k, lbl in ((1, 'BIG'), (0, 'SMALL'), (2, 'SMALL2')):
-    print(lbl, u.SendMessageW(hwnd, 0x7F, k, 0))     # WM_GETICON，非 0 即已挂上
+    print(lbl, u.SendMessageW(hwnd, 0x7F, k, 0))     # WM_GETICON; non-zero = set
 ```
 
-`smoke_test.py` 已把这三槽位非空做成断言。
+`smoke_test.py` asserts that all three slots are non-zero.
 
-## 界面
+## Interface
 
-- **左侧**：按物料类别分组的竖排图标菜单（仅显示**已建库**的类别）
-  - 无源器件：01电阻 · 02电容 · 09电感
-  - 半导体：05二极管 · 06晶体管
-  - 集成电路：07IC
-- **右侧**：当前类别的两个纵向分栏（sash 可拖拽调高）
-  - **原理图库 (SchLib)** —— 显示 `符号名 / 料号 / MPN / 厂商 / 封装 / spec`
-  - **PCB库 (PcbLib)** —— 显示 `封装名`
-- **筛选：每列独立 + 全表搜索**
-  - **每列下方有自己的筛选框**（就在表头正下方，随列宽自动对齐/同步）
-  - 全表搜索框（跨所有列 OR）与列筛选**叠加生效**（AND）
-  - 列筛选语法：
-    | 写法 | 含义 |
-    |---|---|
-    | `CJ` | 该列含 `CJ`（不区分大小写） |
-    | `100V 0.25A` | 该列**同时**含 `100V` 与 `0.25A`（空格 = 且） |
-    | `!CJ` | 该列**不含** `CJ`（`!` = 排除） |
-    | `!CJ !Yangjie` | 两个词都排除 |
-  - **双击任意筛选框** → 弹出该列全部去重取值（带出现次数），点选即应用 —— 适合「厂商/封装」这类低基数列
-  - 「清空筛选」一键清掉全部列筛选 + 全表搜索
-  - 标题右侧显示 `命中 / 总数` 与当前生效的筛选项数
-- **双击数据行** → 弹出完整参数详情（Toplevel 弹窗）
-- 模板/占位符号（`U_3` / `Q_5` / `D` 这类无参数通用图形）以灰色显示
-- 每行标注数据**来源**：`当前文件` / `History 备份` / `明文备份`，非当前文件的会带 `⚠ 可能非最新`
+- **Left**: vertical icon menu grouped by material category (only categories
+  with a built library are shown)
+  - Passives: resistors, capacitors, inductors
+  - Semiconductors: diodes, transistors
+  - Integrated circuits: IC
+- **Right**: two vertically split panes for the active category (draggable
+  sash): schematic symbols (`name / part number / MPN / manufacturer /
+  footprint / spec`) and PCB footprints (`footprint name`).
+- **Filtering**: every column has its own filter box directly under its
+  header, aligned to the column width. The global search box (OR across all
+  columns) and per-column filters (AND) combine. Filter syntax:
 
-## 文件说明
+  | Expression | Meaning |
+  |---|---|
+  | `CJ` | column contains `CJ` (case-insensitive) |
+  | `100V 0.25A` | column contains both `100V` and `0.25A` |
+  | `!CJ` | column does not contain `CJ` |
+  | `!CJ !Yangjie` | excludes both terms |
 
-| 文件 | 作用 |
+  Double-click a filter box to see all distinct values with occurrence
+  counts — useful for low-cardinality columns such as manufacturer and
+  footprint. A single button clears all filters. The header shows
+  `matched / total` and the number of active filters.
+- Double-click a row for full parameter details (Toplevel dialog).
+- Template/placeholder symbols (e.g. `U_3`, `Q_5`, `D`) are shown in grey.
+- Each row labels the data source; rows not using the current master file are
+  marked as potentially outdated.
+
+## Files
+
+| File | Purpose |
 |---|---|
-| `main.py` | GUI 主程序（**仅依赖 tkinter + 标准库**） |
-| `lib_cache.json` | 预解析的库数据（GUI 读它，因此启动即秒开） |
-| `build_cache.py` | 重建缓存的脚本（**需要 olefile**，用隔离 venv 跑） |
-| `lib_reader.py` | 库解析模块（olefile 读 OLE 结构） |
-| `mcp_client.py` | 离线 MCP 的 stdio JSON-RPC 客户端 |
-| `gui_style.py` | 统一 UI 风格模块（本机所有 GUI 的视觉基准） |
-| `gui_sidebar.py` | 左侧竖排图标菜单组件 + 17 个矢量图标 |
-| `smoke_test.py` | 查看器无头自检（54 项，含阴性对照） |
-| `_run3s.py` | 真 mainloop 跑 3 秒后自关（验证能起窗口） |
-| `启动元件库查看器.cmd` | 双击启动器 |
+| `main.py` | GUI application (tkinter + standard library only) |
+| `lib_cache.json` | Pre-parsed library data (read by the GUI at startup) |
+| `build_cache.py` | Cache rebuild script (needs olefile; run in the isolated venv) |
+| `lib_reader.py` | Library parser (reads the OLE container with olefile) |
+| `mcp_client.py` | stdio JSON-RPC client for the offline MCP |
+| `gui_style.py` | Shared UI style module |
+| `gui_sidebar.py` | Vertical icon menu and 17 vector icons |
+| `smoke_test.py` | Headless viewer self-test, including negative cases |
+| `_run3s.py` | Starts a real mainloop for three seconds and exits |
+| `启动元件库查看器.cmd` | Double-click launcher |
 
-## 两个必需的解释器（架构要点）
+## Two Python interpreters
 
-GUI 只依赖 `tkinter`，而 `tkinter` 只在**系统 Python 3.12** 里有；
-重建缓存需要 `olefile`，而装了 `olefile` 的**隔离 venv 3.13 没有 tkinter**。
+The GUI only needs `tkinter`, which exists in the **system Python 3.12**.
+Rebuilding the cache needs `olefile`, installed only in an **isolated
+Python 3.13 venv** that has no `tkinter`. The two roles are therefore split:
 
-因此拆成两半：
-
-| 用途 | 解释器 | 配置位置 |
+| Role | Interpreter | Configured in |
 |---|---|---|
-| 跑 GUI | `C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe` | `启动元件库查看器.cmd` |
-| 重建缓存 | `C:\Users\admin\.workbuddy\binaries\python\envs\default\Scripts\python.exe` | `main.py` 顶部 `BUILD_PY` |
+| GUI | `C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe` | `启动元件库查看器.cmd` |
+| Cache rebuild | `C:\Users\admin\.workbuddy\binaries\python\envs\default\Scripts\python.exe` | `BUILD_PY` at the top of `main.py` |
 
-界面里的「**重建缓存**」按钮会自动调对那个 venv 解释器，无需手配。
+The **Rebuild Cache** button in the GUI invokes the correct interpreter
+automatically.
 
-## 数据来源与 DLP 说明
+## Data source
 
-### 库根目录（2026-09-23 起）
+### Library root
 
-库正本已整理到 **`E:\MaterialLib\AD_Lib\<类别>\`**，以后在此维护。
-（2026-09-23：上级目录由「物料表」改名为英文 **`MaterialLib`**；原 `E:\project\800-6\PCB_prj\script_test\` 保留为历史归档——History / `.bak_*` / 快照 / CSV 仍在原处。）
+Library masters live in `E:\MaterialLib\AD_Lib\<category>\`. Path resolution
+priority (see `lib_reader.get_base()`):
 
-路径解析优先级（见 `lib_reader.get_base()`）：
+1. environment variable `LIBVIEWER_BASE`
+2. `libviewer_cfg.json` key `lib_base`
+3. built-in default `E:\MaterialLib\AD_Lib`
 
-1. 环境变量 `LIBVIEWER_BASE`
-2. `libviewer_cfg.json` 的 `lib_base`
-3. 代码默认 `BASE_DEFAULT = E:\MaterialLib\AD_Lib`
+Override it by editing the config file, setting the environment variable, or
+calling `lib_reader.set_base(r'...')` from Python (atomic write with backup).
 
-改路径三选一：改代码常量、写 `libviewer_cfg.json`、或 `set LIBVIEWER_BASE=...` 临时覆盖。
-也可在 Python 里调 `lib_reader.set_base(r'...')`（原子写 + 自动备份）。
-
-### 目录布局
+### Directory layout
 
 ```
 E:\MaterialLib\AD_Lib\
@@ -214,150 +199,108 @@ E:\MaterialLib\AD_Lib\
 ├── inductor\   Inductor.SchLib   Inductor.PcbLib
 ├── ic\         IC.SchLib         IC.PcbLib
 ├── others\     Others.SchLib     Others.PcbLib
-├── Port\       Port.SchLib       Port.PcbLib   ← 25端子（结构件/连接器类），目录已建，待放库
-└── EPIC.SchLib / EPIC.PcbLib     ← 他人放置的另一套库，与本项目无关，未动
+└── Port\       Port.SchLib       Port.PcbLib
 ```
 
-### 类别清单（单一真源 = `lib_reader.CATEGORIES`）
+### Categories (single source of truth: `lib_reader.CATEGORIES`)
 
-| BOM 分类 | 子目录 | 文件主干 | 侧边栏分组 | 图标 |
+| BOM category | Directory | File stem | Sidebar group | Icon |
 |---|---|---|---|---|
-| 01电阻 | `resistor` | `Resistor` | 基础件 | `equalizer` |
-| 02电容 | `capacitor` | `Capacitor` | 基础件 | `battery` |
-| 05二极管 | `diode` | `Diode` | 基础件 | `signal` |
-| 06晶体管 | `transistor` | `Transistor` | 基础件 | `power` |
-| 09电感 | `inductor` | `Inductor` | 基础件 | `ring` |
-| 07IC | `ic` | `IC` | 芯片 | `code` |
-| 25端子 | `Port` | `Port` | 结构件 | `plug` |
-| 10其他 | `others` | `Others` | 其他 | `file` |
+| 01 resistor | `resistor` | `Resistor` | Passives | `equalizer` |
+| 02 capacitor | `capacitor` | `Capacitor` | Passives | `battery` |
+| 05 diode | `diode` | `Diode` | Passives | `signal` |
+| 06 transistor | `transistor` | `Transistor` | Passives | `power` |
+| 09 inductor | `inductor` | `Inductor` | Passives | `ring` |
+| 07 IC | `ic` | `IC` | ICs | `code` |
+| 25 connector | `Port` | `Port` | Mechanical | `plug` |
+| 10 other | `others` | `Others` | Other | `file` |
 
-> 新增类别只需改 `lib_reader.CATEGORIES`；`main.py` 的 `META`/`ORDER` 只管分组与排序，未列入 `ORDER` 的类别会自动追加到末尾。
-> ⚠️ `Port` **大写 P** 是刻意的（与 BOM 分类「25端子」对应），同库其余子目录为小写。
+Adding a category only requires a change to `lib_reader.CATEGORIES`;
+`META` / `ORDER` in `main.py` only control grouping and ordering.
 
-> ⚠️ `download\` 厂商参考包**未**随库搬迁，仍在 `script_test\transistor\download\`（它不属于「库正本」）。
+Current symbol and footprint counts are reported in `lib_cache.json` and in
+the viewer header; they are intentionally not hard-coded here.
 
-### DLP 与明文来源
-
-**AD 保存落盘的文件是 DLP 密文**（头 `%TSD-Header-%%`），olefile 读不了。
-`lib_reader.resolve_sources()` 自动按优先级挑**明文**来源：
-
-1. **当前文件** —— 若本身是明文（未被 AD 重存过）
-2. **History 明文 zip** —— AD 自带备份（`History/*.SchLib.Zip`），内容为明文 OLE
-3. **`.bak_*` 明文备份** —— 取最新的一个
-
-界面会显示当前用的是哪一种，用备份时标注 `⚠ 可能非最新`。
-
-### 当前各类别来源（2026-09-23 整理后 · 全部为当前文件）
-
-| 类别 | 目录 | 符号 | 封装 | 原理图库来源 | PCB库来源 |
-|---|---|---|---|---|---|
-| 01电阻 | `resistor\` | 456 | 8 | 当前文件 | 当前文件 |
-| 02电容 | `capacitor\` | 163 | 27 | 当前文件 | 当前文件 |
-| 05二极管 | `diode\` | 51 | 12 | 当前文件 | 当前文件 |
-| 06晶体管 | `transistor\` | 104 | 51 | 当前文件 | 当前文件 |
-| 09电感 | `inductor\` | 1 | 1 | 当前文件 | 当前文件 |
-| 07IC | `ic\` | 174 | 89 | 当前文件 | 当前文件 |
-| 10其他 | `others\` | 9 | 5 | 当前文件 | 当前文件 |
-| 25端子 | `Port\` | — | — | 待放库（2026-09-23 目录已建，暂空） | 待放库 |
-| **合计** | | **958** | **193** | | |
-
-> 整理时把 5 个「正本为密文」的 PcbLib 换成了**最新的明文版本**（来自 `.bak_*` / `History`），
-> 使上述 7 类全部可直接离线读取，不再需要回退。迁移明细见 `_migrate_report.json`。
-> **`Port`（25端子）为 2026-09-23 新增的第 8 类**，`AD_Lib\Port\` 目录与 GUI 页签/图标已就位，库文件稍后再放。
-
-## 自检
+## Self-test
 
 ```bash
-# 一键跑全部（推荐；自动带上 olefile 的 PYTHONPATH）
+# All tests in one go (PYTHONPATH for olefile is set automatically)
 C:\Users\admin\.workbuddy\binaries\python\envs\default\Scripts\python.exe _runtests.py
 
-# 单独跑（需先 export PYTHONPATH=<venv>\Lib\site-packages，系统 Python 无 olefile）
-# 查看器自检（63 项，含阴性对照）
+# Viewer self-test (including negative cases)
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe smoke_test.py
 
-# 真 mainloop 起窗口
+# Real mainloop smoke test
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe _run3s.py
 
-# 风格模块自检（各应为 RESULT: PASS）
+# Style modules (each should print RESULT: PASS)
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe gui_style.py
 C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe gui_sidebar.py
 ```
 
-> 测试里的类别数与页面数均**动态取自 `lib_reader.CATEGORIES`**，新增类别不必改测试。
+Category counts and page counts in the tests are read dynamically from
+`lib_reader.CATEGORIES`, so new categories need no test changes.
 
-## 库搬迁工具（一次性，已执行完，留档备查）
+## Migration utilities (one-off, kept for reference)
 
-| 脚本 | 作用 |
+| Script | Purpose |
 |---|---|
-| `_plan_migrate.py` | 只读盘点：确定每类 SchLib/PcbLib 的明文来源 → `_plan_migrate.json` |
-| `_do_migrate.py` | 按方案复制到 `AD_Lib\<类别>\`（`--apply` 才真写；默认干跑），含 SHA256 双端校验 |
-| `_migrate_report.json` | 搬迁结果报告（每项的来源、SHA、符号/封装数、校验结论） |
-| `_runtests.py` | 用系统 Python 跑全部自检（shell 环境异常时的替代入口） |
+| `_plan_migrate.py` | Read-only inventory: chooses a source snapshot for each SchLib/PcbLib → `_plan_migrate.json` |
+| `_do_migrate.py` | Copies into `AD_Lib\<category>\` (`--apply` to write; dry-run by default), with SHA256 checks on both ends |
+| `_migrate_report.json` | Migration result report (source, SHA, symbol/footprint counts, verification) |
+| `_runtests.py` | Runs all self-tests with the system Python |
 
-搬迁安全策略：**绝不覆盖目标已存在的同名文件**（除非 `--force`，且会先备份被覆盖者）。
+Migration never overwrites an existing target unless `--force` is given, and
+even then the overwritten file is backed up first.
 
-## 技术要点（改动前必读）
+## Technical notes
 
-### SchLib 参数记录格式
+### SchLib parameter records
+
 ```
-|RECORD=41|IndexInSheet=n|OwnerPartId=1|...|IsHidden=T|Text=<值>|Name=<参数名>|UniqueID=...
+|RECORD=41|IndexInSheet=n|OwnerPartId=1|...|IsHidden=T|Text=<value>|Name=<name>|UniqueID=...
 ```
-- ⚠️ **`Text=` 在 `Name=` 之前** —— 但**顺序不固定**！同一文件内两种顺序都可能出现
-  （`Diode.SchLib` 里第 1 个符号 `Name` 先行、第 2 个 `Text` 先行）。
-  **必须段内分别取 `Text=` 与 `Name=` 再配对，不要假定先后。**
-- ⚠️ 一个段里可能同时有 `Text=` 与 `%UTF8%Text=`；**中文以 UTF-8 存储**，解码须优先 `%UTF8%Text=`，再 UTF-8，最后回退 GBK
-  （否则 `Coilcraft(线艺)` 会变成 `Coilcraft(绾胯壓)`）
-- 每个符号 = 独立 OLE 存储 `<LibReference>/Data`
 
-### 🔴 封装名（Footprint）的权威来源是 `RECORD=45`，不是 `RECORD=41` 参数
+- `Text=` may appear **before or after** `Name=` — both orders occur in the
+  same file. Always extract both fields within a segment and pair them.
+- A segment may carry both `Text=` and `%UTF8%Text=`. Decode with
+  `%UTF8%Text=` first, then UTF-8, then GBK as a last resort; otherwise
+  non-ASCII characters in manufacturer names are mangled.
+- Each symbol is a separate OLE storage `<LibReference>/Data`.
 
-这是个**曾导致电阻/电容封装整列空白**的坑：
+### Footprint names come from `RECORD=45`, not a `Footprint` parameter
 
-| 库 | 符号数 | 有 `RECORD=45` | 有 `Name=Footprint` 参数 |
-|---|---|---|---|
-| 01电阻 | 456 | 456 | **0** |
-| 02电容 | 163 | 157 | **0** |
-| 05二极管 | 51 | 46 | 44 |
-| 06晶体管 | 102 | 90 | 72 |
-| 09电感 | 1 | 1 | 1 |
-| 07IC | 174 | 159 | 154 |
+This once caused the entire footprint column to be blank for resistors and
+capacitors: their symbols have no `Footprint` parameter at all; the name
+lives only in `ModelName=` of `RECORD=45`:
 
-**电阻库 456/456、电容库 157/163 的符号压根没有 `Footprint` 参数** ——
-封装名只存在于 `RECORD=45` 的 `ModelName=` 里：
 ```
 |RECORD=45|ModelName=DIP-D10xL16mm|ModelType=PCBLIB|IsCurrent=T|ModelDatafileEntity0=...|
 ```
-其余库两者都有，实测取值**从无不一致**。
 
-⇒ 解析规则（`lib_reader._pick_footprint`）：
-**「当前 + PCBLIB」的模型 → 任一 PCBLIB 模型 → `Footprint` 参数**。
+Resolution rule in `lib_reader._pick_footprint`: current + PCBLIB model →
+any PCBLIB model → `Footprint` parameter.
 
-### ⚠️ 7 个符号有料号但未挂封装（数据缺口，非解析问题）
+### Symbols with a part number but no footprint
 
-| 库 | 符号 | MPN | 厂商 |
-|---|---|---|---|
-| 02电容 | `02E108000703` | ERS1VM102G20OT | AISHI(艾华集团) |
-| 02电容 | `02E127000200` | B40940A8127M000 | TDK |
-| 02电容 | `02E127000413` | VKME1001J121MVTJH9 | Ymin(永铭) |
-| 02电容 | `02M205000210` | C3D3L205KB00382 | Faratronic(厦门法拉) |
-| 02电容 | `02Y222000912` | SC08B222K302YB | FH(风华) |
-| 02电容 | `02Y472000917` | YU7AC472M120D05A7W | Walsin(华新科) |
-| 06晶体管 | `06M010000139` | MP87006GMWTH-Z | MPS(芯源) |
+A few symbols are valid BOM items but have no `RECORD=45` model link. Those
+rows show `⚠ no footprint` in the footprint column instead of a blank cell,
+so they are not mistaken for a parser failure.
 
-这 7 个在 BOM 里都是正常料（有 MPN/厂商/spec），但 SchLib 里**没有 `RECORD=45` 模型链接**。
-界面上这 7 行会在「封装」列显示 **`⚠ 未挂封装`**（不再留空，避免被误认为解析失败）。
+### PcbLib structure
 
-### PcbLib 结构
-- 每个封装 = 顶层 OLE 存储 `<封装名>/Data`
-- 必须排除非封装的顶层存储：`FileHeader`、`FileVersionInfo`、`Library`
+- Each footprint is a top-level OLE storage `<footprint name>/Data`.
+- Non-footprint storages (`FileHeader`, `FileVersionInfo`, `Library`) must be
+  excluded.
 
-### 每列筛选框如何与列对齐
-筛选行是**放在 Treeview 同一个父容器的上一行**（`inner` 的 grid row 0，tree 在 row 1），
-所以左边缘天然对齐。每个筛选框所在的 grid 列 `minsize` = 对应 Treeview 列的 `width`：
+### Column filter alignment
+
+The filter row sits in the same parent container as the Treeview, one grid
+row above it, so the left edges align naturally. Each filter box's grid
+column `minsize` equals the matching Treeview column width:
 
 ```python
 self.tree.bind('<Configure>', self._sync_filter_widths)
-# 变化时才重设，避免 Configure 递归
 w = tuple(self.tree.column(k, 'width') for k in self.keys)
 if w != self._last_w:
     self._last_w = w
@@ -365,14 +308,15 @@ if w != self._last_w:
         self.fbar.columnconfigure(i, minsize=ww)
 ```
 
-⚠️ 注意 **`_vals()` 同时用于「插入行」与「反查行对象」**：
-「未挂封装」的替换值必须走同一个函数，否则双击反查会取不到行（此前踩过）。
+`_vals()` is used both to insert rows and to look a row object up by value;
+the `no footprint` placeholder must go through the same function or the
+double-click lookup fails.
 
-## 不在本次范围
+## Out of scope
 
-BOM 里共 23 个物料类别。**已建库 8 类**：`01电阻 / 02电容 / 05二极管 / 06晶体管 / 09电感 /
-07IC / 10其他 / 25端子`（其中 **25端子** 于 2026-09-23 建目录与 GUI 页签，库文件尚未放入）。
-
-其余 15 个（03磁材 / 04压敏 / 08变压器 / 10外壳 / 12开关 / 13PCB /
-14保险丝 / 15散热器 / 16塑胶材料 / 17铜柱铜块 / 18螺丝螺母金属垫片 / 19胶 / 22包装材料 /
-27标签 / 7阶测试板料号 / 9阶成品料号）**尚未建库**，故不设 tab。
+The BOM has 23 material categories. Eight have a built library: resistors,
+capacitors, diodes, transistors, inductors, IC, connectors, and other. The
+remaining categories (magnetics, varistors, transformers, enclosures,
+switches, PCBs, fuses, heatsinks, plastics, standoffs, fasteners, adhesives,
+packaging, labels, and test/finished-board part numbers) are not yet in the
+library and therefore have no tab.
